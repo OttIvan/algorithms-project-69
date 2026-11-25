@@ -28,7 +28,8 @@ class SearchEngineTest {
                         Map.of("id", "no-match", "text", "pints pints pints"));
 
         assertEquals(
-                List.of("z-first", "a-second", "once"), SearchEngine.search(rankedDocuments, "PINT!"));
+                List.of("z-first", "a-second", "once"),
+                SearchEngine.search(rankedDocuments, "PINT!"));
     }
 
     @Test
