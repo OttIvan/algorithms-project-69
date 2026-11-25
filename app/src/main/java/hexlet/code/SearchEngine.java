@@ -21,12 +21,9 @@ public class SearchEngine {
             return List.of();
         }
 
-        var scores = relevanceByDocument(buildIndex(documents), queryTerms);
+        var scores = relevanceByDocument(buildIndex(documents), queryTerms, documents.size());
         var matches = new ArrayList<>(scores.keySet());
-        var relevanceOrder =
-                Comparator.comparingInt(Relevance::matchedTerms)
-                        .thenComparingInt(Relevance::occurrences);
-        Comparator<IndexedDocument> byRelevance = Comparator.comparing(scores::get, relevanceOrder);
+        Comparator<IndexedDocument> byRelevance = Comparator.comparingDouble(scores::get);
         matches.sort(byRelevance.reversed().thenComparingInt(IndexedDocument::position));
         return matches.stream().map(IndexedDocument::id).collect(Collectors.toList());
     }
@@ -36,8 +33,9 @@ public class SearchEngine {
         var index = new HashMap<String, Map<IndexedDocument, Integer>>();
         var position = 0;
         for (var document : documents) {
-            var indexedDocument = new IndexedDocument(document.get("id"), position++);
-            for (var term : termsOf(document.get("text"))) {
+            var terms = termsOf(document.get("text"));
+            var indexedDocument = new IndexedDocument(document.get("id"), position++, terms.size());
+            for (var term : terms) {
                 var postings = index.computeIfAbsent(term, key -> new HashMap<>());
                 postings.merge(indexedDocument, 1, Integer::sum);
             }
@@ -45,16 +43,30 @@ public class SearchEngine {
         return index;
     }
 
-    private static Map<IndexedDocument, Relevance> relevanceByDocument(
-            Map<String, Map<IndexedDocument, Integer>> index, Set<String> queryTerms) {
-        var scores = new HashMap<IndexedDocument, Relevance>();
+    private static Map<IndexedDocument, Double> relevanceByDocument(
+            Map<String, Map<IndexedDocument, Integer>> index,
+            Set<String> queryTerms,
+            int documentCount) {
+        var scores = new HashMap<IndexedDocument, Double>();
         for (var term : queryTerms) {
-            for (var posting : index.getOrDefault(term, Map.of()).entrySet()) {
-                var termScore = new Relevance(1, posting.getValue());
-                scores.merge(posting.getKey(), termScore, Relevance::plus);
+            var postings = index.getOrDefault(term, Map.of());
+            if (postings.isEmpty()) {
+                continue;
+            }
+
+            var idf = inverseDocumentFrequency(documentCount, postings.size());
+            for (var posting : postings.entrySet()) {
+                var document = posting.getKey();
+                var tf = (double) posting.getValue() / document.termCount();
+                scores.merge(document, tf * idf, Double::sum);
             }
         }
         return scores;
+    }
+
+    private static double inverseDocumentFrequency(int documentCount, int documentFrequency) {
+        var ratio = (documentCount - documentFrequency + 1) / (documentFrequency + 0.5);
+        return Math.log(1 + ratio) / Math.log(2);
     }
 
     private static List<String> termsOf(String text) {
@@ -65,12 +77,5 @@ public class SearchEngine {
                 .toList();
     }
 
-    private record IndexedDocument(String id, int position) {}
-
-    private record Relevance(int matchedTerms, int occurrences) {
-        private Relevance plus(Relevance other) {
-            return new Relevance(
-                    matchedTerms + other.matchedTerms, occurrences + other.occurrences);
-        }
-    }
+    private record IndexedDocument(String id, int position, int termCount) {}
 }

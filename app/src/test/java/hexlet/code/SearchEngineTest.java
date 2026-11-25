@@ -14,12 +14,12 @@ class SearchEngineTest {
                     Map.of("id", "doc3", "text", "I'm your shooter."));
 
     @Test
-    void ranksMatchingDocumentsByDescendingTermFrequency() {
+    void ranksMatchingDocumentsByTfIdfForSingleTerm() {
         assertEquals(List.of("doc2", "doc1"), SearchEngine.search(documents, "shoot"));
     }
 
     @Test
-    void countsNormalizedOccurrencesAndKeepsInputOrderForTies() {
+    void keepsInputOrderForEqualTfIdfScores() {
         var rankedDocuments =
                 List.of(
                         Map.of("id", "once", "text", "pint!"),
@@ -28,7 +28,7 @@ class SearchEngineTest {
                         Map.of("id", "no-match", "text", "pints pints pints"));
 
         assertEquals(
-                List.of("z-first", "a-second", "once"),
+                List.of("once", "z-first", "a-second"),
                 SearchEngine.search(rankedDocuments, "PINT!"));
     }
 
@@ -49,7 +49,7 @@ class SearchEngineTest {
     }
 
     @Test
-    void prioritizesDistinctMatchesThenTotalOccurrences() {
+    void sumsTfIdfAcrossDistinctQueryTerms() {
         var rankedDocuments =
                 List.of(
                         Map.of("id", "one", "text", "shoot shoot shoot shoot shoot"),
@@ -59,6 +59,39 @@ class SearchEngineTest {
         var expected = List.of("three", "two", "one");
         assertEquals(expected, SearchEngine.search(rankedDocuments, "shoot at"));
         assertEquals(expected, SearchEngine.search(rankedDocuments, "shoot at SHOOT!"));
+    }
+
+    @Test
+    void ranksAnArticleAboveRepetitiveSpam() {
+        var rankedDocuments =
+                List.of(
+                        Map.of("id", "spam", "text", "trash trash trash trash"),
+                        Map.of("id", "article", "text", "trash island"));
+
+        var result = SearchEngine.search(rankedDocuments, "trash island");
+        assertEquals(List.of("article", "spam"), result);
+    }
+
+    @Test
+    void normalizesTermFrequencyByDocumentLength() {
+        var rankedDocuments =
+                List.of(
+                        Map.of("id", "long", "text", "trash trash a b c d"),
+                        Map.of("id", "short", "text", "trash island ! —"));
+
+        assertEquals(List.of("short", "long"), SearchEngine.search(rankedDocuments, "trash"));
+    }
+
+    @Test
+    void aRareTermCanOutweighTwoCommonTerms() {
+        var rankedDocuments =
+                List.of(
+                        Map.of("id", "first", "text", "trash island"),
+                        Map.of("id", "second", "text", "trash island"),
+                        Map.of("id", "rare", "text", "ocean"));
+
+        var result = SearchEngine.search(rankedDocuments, "trash island ocean");
+        assertEquals(List.of("rare", "first", "second"), result);
     }
 
     @Test
