@@ -19,14 +19,53 @@ class SearchEngineTest {
     }
 
     @Test
-    void keepsPunctuationAttachedToWords() {
-        assertEquals(List.of(), SearchEngine.search(documents, "pint"));
+    void stripsPunctuationInDocumentsAndQueries() {
+        assertEquals(List.of("doc1"), SearchEngine.search(documents, "pint"));
         assertEquals(List.of("doc1"), SearchEngine.search(documents, "pint!"));
     }
 
     @Test
-    void comparesWordsCaseSensitively() {
-        assertEquals(List.of(), SearchEngine.search(documents, "Shoot"));
+    void ignoresCaseInDocumentsAndQueries() {
+        var uppercaseDocuments = List.of(Map.of("id", "doc", "text", "TRASH"));
+
+        assertEquals(List.of("doc1"), SearchEngine.search(documents, "PINT"));
+        assertEquals(List.of("doc"), SearchEngine.search(uppercaseDocuments, "trash"));
+    }
+
+    @Test
+    void joinsPartsOfWordsWithApostrophes() {
+        assertEquals(List.of("doc1"), SearchEngine.search(documents, "can't"));
+        assertEquals(List.of("doc1"), SearchEngine.search(documents, "cant"));
+        assertEquals(List.of(), SearchEngine.search(documents, "can"));
+        assertEquals(List.of(), SearchEngine.search(documents, "t"));
+    }
+
+    @Test
+    void joinsPartsOfHyphenatedWords() {
+        var hyphenatedDocuments = List.of(Map.of("id", "doc", "text", "alpha-beta"));
+
+        assertEquals(List.of("doc"), SearchEngine.search(hyphenatedDocuments, "alphabeta"));
+        assertEquals(List.of("doc"), SearchEngine.search(hyphenatedDocuments, "alpha-beta"));
+        assertEquals(List.of(), SearchEngine.search(hyphenatedDocuments, "alpha"));
+        assertEquals(List.of(), SearchEngine.search(hyphenatedDocuments, "beta"));
+    }
+
+    @Test
+    void ignoresPunctuationOnlyTokens() {
+        var punctuatedDocuments = List.of(Map.of("id", "doc", "text", "— !!! pint!"));
+
+        assertEquals(List.of(), SearchEngine.search(punctuatedDocuments, "—"));
+        assertEquals(List.of(), SearchEngine.search(punctuatedDocuments, "!!!"));
+        assertEquals(List.of("doc"), SearchEngine.search(punctuatedDocuments, "— PINT"));
+    }
+
+    @Test
+    void keepsDigitsAndUnderscoresAndSplitsOnNewlines() {
+        var multilineDocuments = List.of(Map.of("id", "doc", "text", "first\nItem_42!"));
+
+        assertEquals(List.of("doc"), SearchEngine.search(multilineDocuments, "item_42"));
+        assertEquals(List.of(), SearchEngine.search(multilineDocuments, "item42"));
+        assertEquals(List.of(), SearchEngine.search(multilineDocuments, "first item_42"));
     }
 
     @Test
