@@ -33,6 +33,35 @@ class SearchEngineTest {
     }
 
     @Test
+    void findsDocumentsMatchingAnyQueryTerm() {
+        assertEquals(List.of("doc2", "doc1"), SearchEngine.search(documents, "shoot at me"));
+    }
+
+    @Test
+    void ignoresQueryTermsAbsentFromEveryDocument() {
+        assertEquals(List.of("doc2", "doc1"), SearchEngine.search(documents, "shoot at me, nerd"));
+        assertEquals(List.of(), SearchEngine.search(documents, "nerd absent"));
+    }
+
+    @Test
+    void normalizesPunctuationAndCaseInMultiwordQueries() {
+        assertEquals(List.of("doc2", "doc1"), SearchEngine.search(documents, "SHOOT! AT, ME."));
+    }
+
+    @Test
+    void prioritizesDistinctMatchesThenTotalOccurrences() {
+        var rankedDocuments =
+                List.of(
+                        Map.of("id", "one", "text", "shoot shoot shoot shoot shoot"),
+                        Map.of("id", "two", "text", "shoot at"),
+                        Map.of("id", "three", "text", "shoot at at"));
+
+        var expected = List.of("three", "two", "one");
+        assertEquals(expected, SearchEngine.search(rankedDocuments, "shoot at"));
+        assertEquals(expected, SearchEngine.search(rankedDocuments, "shoot at SHOOT!"));
+    }
+
+    @Test
     void stripsPunctuationInDocumentsAndQueries() {
         assertEquals(List.of("doc1"), SearchEngine.search(documents, "pint"));
         assertEquals(List.of("doc1"), SearchEngine.search(documents, "pint!"));
@@ -79,7 +108,7 @@ class SearchEngineTest {
 
         assertEquals(List.of("doc"), SearchEngine.search(multilineDocuments, "item_42"));
         assertEquals(List.of(), SearchEngine.search(multilineDocuments, "item42"));
-        assertEquals(List.of(), SearchEngine.search(multilineDocuments, "first item_42"));
+        assertEquals(List.of("doc"), SearchEngine.search(multilineDocuments, "first item_42"));
     }
 
     @Test
