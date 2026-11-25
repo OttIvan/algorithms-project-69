@@ -2,6 +2,7 @@ package hexlet.code;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -20,31 +21,40 @@ public class SearchEngine {
             return List.of();
         }
 
-        var matches = new ArrayList<ScoredDocument>();
-        for (var document : documents) {
-            var score = relevance(termsOf(document.get("text")), queryTerms);
-            if (score.matchedTerms() > 0) {
-                matches.add(new ScoredDocument(document.get("id"), score));
-            }
-        }
-
+        var scores = relevanceByDocument(buildIndex(documents), queryTerms);
+        var matches = new ArrayList<>(scores.keySet());
         var relevanceOrder =
                 Comparator.comparingInt(Relevance::matchedTerms)
                         .thenComparingInt(Relevance::occurrences);
-        matches.sort(Comparator.comparing(ScoredDocument::relevance, relevanceOrder).reversed());
-        return matches.stream().map(ScoredDocument::id).collect(Collectors.toList());
+        Comparator<IndexedDocument> byRelevance = Comparator.comparing(scores::get, relevanceOrder);
+        matches.sort(byRelevance.reversed().thenComparingInt(IndexedDocument::position));
+        return matches.stream().map(IndexedDocument::id).collect(Collectors.toList());
     }
 
-    private static Relevance relevance(List<String> documentTerms, Set<String> queryTerms) {
-        var matchedTerms = new HashSet<String>();
-        var occurrences = 0;
-        for (var term : documentTerms) {
-            if (queryTerms.contains(term)) {
-                matchedTerms.add(term);
-                occurrences++;
+    private static Map<String, Map<IndexedDocument, Integer>> buildIndex(
+            List<Map<String, String>> documents) {
+        var index = new HashMap<String, Map<IndexedDocument, Integer>>();
+        var position = 0;
+        for (var document : documents) {
+            var indexedDocument = new IndexedDocument(document.get("id"), position++);
+            for (var term : termsOf(document.get("text"))) {
+                var postings = index.computeIfAbsent(term, key -> new HashMap<>());
+                postings.merge(indexedDocument, 1, Integer::sum);
             }
         }
-        return new Relevance(matchedTerms.size(), occurrences);
+        return index;
+    }
+
+    private static Map<IndexedDocument, Relevance> relevanceByDocument(
+            Map<String, Map<IndexedDocument, Integer>> index, Set<String> queryTerms) {
+        var scores = new HashMap<IndexedDocument, Relevance>();
+        for (var term : queryTerms) {
+            for (var posting : index.getOrDefault(term, Map.of()).entrySet()) {
+                var termScore = new Relevance(1, posting.getValue());
+                scores.merge(posting.getKey(), termScore, Relevance::plus);
+            }
+        }
+        return scores;
     }
 
     private static List<String> termsOf(String text) {
@@ -55,7 +65,12 @@ public class SearchEngine {
                 .toList();
     }
 
-    private record Relevance(int matchedTerms, int occurrences) {}
+    private record IndexedDocument(String id, int position) {}
 
-    private record ScoredDocument(String id, Relevance relevance) {}
+    private record Relevance(int matchedTerms, int occurrences) {
+        private Relevance plus(Relevance other) {
+            return new Relevance(
+                    matchedTerms + other.matchedTerms, occurrences + other.occurrences);
+        }
+    }
 }
