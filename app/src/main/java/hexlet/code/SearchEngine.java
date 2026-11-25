@@ -1,10 +1,13 @@
 package hexlet.code;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class SearchEngine {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
@@ -17,15 +20,21 @@ public class SearchEngine {
         }
 
         var term = queryTerms.getFirst();
-        var matches = new ArrayList<String>();
+        var matches = new ArrayList<ScoredDocument>();
 
         for (var document : documents) {
-            if (termsOf(document.get("text")).contains(term)) {
-                matches.add(document.get("id"));
+            var score = relevance(termsOf(document.get("text")), term);
+            if (score > 0) {
+                matches.add(new ScoredDocument(document.get("id"), score));
             }
         }
 
-        return matches;
+        matches.sort(Comparator.comparingInt(ScoredDocument::score).reversed());
+        return matches.stream().map(ScoredDocument::id).collect(Collectors.toList());
+    }
+
+    private static int relevance(List<String> documentTerms, String queryTerm) {
+        return Collections.frequency(documentTerms, queryTerm);
     }
 
     private static List<String> termsOf(String text) {
@@ -35,4 +44,6 @@ public class SearchEngine {
                 .filter(term -> !term.isEmpty())
                 .toList();
     }
+
+    private record ScoredDocument(String id, int score) {}
 }
