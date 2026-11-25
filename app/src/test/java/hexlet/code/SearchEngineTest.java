@@ -14,8 +14,22 @@ class SearchEngineTest {
                     Map.of("id", "doc3", "text", "I'm your shooter."));
 
     @Test
-    void returnsEachMatchingIdOnceInInputOrder() {
-        assertEquals(List.of("doc1", "doc2"), SearchEngine.search(documents, "shoot"));
+    void ranksMatchingDocumentsByDescendingTermFrequency() {
+        assertEquals(List.of("doc2", "doc1"), SearchEngine.search(documents, "shoot"));
+    }
+
+    @Test
+    void countsNormalizedOccurrencesAndKeepsInputOrderForTies() {
+        var rankedDocuments =
+                List.of(
+                        Map.of("id", "once", "text", "pint!"),
+                        Map.of("id", "z-first", "text", "PINT! pint."),
+                        Map.of("id", "a-second", "text", "pint pint!"),
+                        Map.of("id", "no-match", "text", "pints pints pints"));
+
+        assertEquals(
+                List.of("z-first", "a-second", "once"),
+                SearchEngine.search(rankedDocuments, "PINT!"));
     }
 
     @Test
