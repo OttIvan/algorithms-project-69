@@ -29,7 +29,8 @@ public class SearchEngine {
     }
 
     private static List<String> termsOf(String text) {
-        return WHITESPACE.splitAsStream(text)
+        return WHITESPACE
+                .splitAsStream(text)
                 .map(token -> NON_WORD.matcher(token).replaceAll("").toLowerCase(Locale.ROOT))
                 .filter(term -> !term.isEmpty())
                 .toList();
