@@ -1,6 +1,6 @@
 plugins {
     java
-    id("com.diffplug.spotless") version "7.0.2"
+    id("com.diffplug.spotless") version "8.11.0"
 }
 
 group = "hexlet.code"
@@ -9,10 +9,8 @@ repositories {
     mavenCentral()
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(21)
 }
 
 dependencies {
